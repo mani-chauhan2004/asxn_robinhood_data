@@ -13,8 +13,11 @@ class CacheService:
 
 
     async def set_cache(self, key: str, data: dict, ttl: int) -> None:
-        redis = await get_redis()
-        await redis.set(key, json.dumps(data), ex=ttl)
+        try:
+            redis = await get_redis()
+            await redis.set(key, json.dumps(data), ex=ttl)
+        except Exception:
+            pass
 
 
     async def invalidate_cache(self, key: str) -> None:

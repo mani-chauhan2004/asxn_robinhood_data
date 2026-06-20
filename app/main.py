@@ -5,7 +5,7 @@ import atexit
 import uvicorn
 from fastapi import FastAPI
 from app.core.config import settings
-from app.core.paths import PROJECT_ROOT
+from app.core.paths import PROJECT_ROOT, LOG_CONFIG_FILE
 from contextlib import asynccontextmanager
 from app.api.router import router
 from app.core.redis_client import close_redis
@@ -18,8 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 logger = logging.getLogger("robinhood_data")
 
 def setup_logging():
-    config_file = PROJECT_ROOT / "app" / "logging" / "config" / "config.json"
-    with open(config_file, "r") as f:
+    with open(LOG_CONFIG_FILE, "r") as f:
         config = json.load(f)
     # Ensure log file directory exists (RotatingFileHandler does not create it)
     for name, handler_cfg in config.get("handlers", {}).items():
