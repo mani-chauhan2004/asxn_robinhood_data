@@ -96,33 +96,68 @@ def compute_assets_metrics() -> None:
     tf_rows = json.loads((DATA_DIR / "token_factory.json").read_text()).get("rows", [])
     tb_rows = json.loads((DATA_DIR / "token_balances.json").read_text()).get("rows", [])
     sp_rows = json.loads((DATA_DIR / "stock_prices.json").read_text()).get("rows", [])
+    dm_rows = json.loads((DATA_DIR / "daily_metrics.json").read_text()).get("rows", [])
 
     price_map = {r["symbol"]: r["price"] for r in sp_rows}
 
-    total_assets = len({r["token_symbol"] for r in tf_rows})
-    categories   = len({r["category"] for r in tf_rows})
+    # Categories from token_factory
+    category_names = sorted({r["category"] for r in tf_rows})
+    total_assets   = len({r["token_symbol"] for r in tf_rows})
 
-    total_value  = 0.0
-    largest_symbol, largest_name, largest_value = None, None, 0.0
-
+    # Value per asset, top 7, largest
+    asset_values = []
     for r in tb_rows:
         sym   = r["token_symbol"]
         value = r["shares_tokenized"] * price_map.get(sym, 0.0)
-        total_value += value
-        if value > largest_value:
-            largest_value  = value
-            largest_symbol = sym
-            largest_name   = r["token_name"]
+        asset_values.append((value, sym, r["token_name"]))
+
+    asset_values.sort(reverse=True)
+    total_value = sum(v for v, _, _ in asset_values)
+
+    top_assets = [
+        {"symbol": sym, "name": name}
+        for _, sym, name in asset_values[:7]
+    ]
+
+    largest_value, largest_symbol, largest_name = asset_values[0]
+
+    # TVL changes from daily_metrics: net_change (shares) × price
+    latest_day = max(r["day"] for r in dm_rows)
+    cutoff_30d = sorted({r["day"] for r in dm_rows})[-30]
+
+    tvl_change_24h = sum(
+        r["net_change"] * price_map.get(r["token_symbol"], 0.0)
+        for r in dm_rows if r["day"] == latest_day
+    )
+    tvl_change_30d = sum(
+        r["net_change"] * price_map.get(r["token_symbol"], 0.0)
+        for r in dm_rows if r["day"] >= cutoff_30d
+    )
+
+    largest_change_24h = sum(
+        r["net_change"] * price_map.get(r["token_symbol"], 0.0)
+        for r in dm_rows if r["day"] == latest_day and r["token_symbol"] == largest_symbol
+    )
+    largest_change_30d = sum(
+        r["net_change"] * price_map.get(r["token_symbol"], 0.0)
+        for r in dm_rows if r["day"] >= cutoff_30d and r["token_symbol"] == largest_symbol
+    )
 
     metrics = {
         "total_assets":          total_assets,
+        "top_assets":            top_assets,
         "total_value_tokenized": round(total_value, 2),
+        "tvl_change_24h":        round(tvl_change_24h, 2),
+        "tvl_change_30d":        round(tvl_change_30d, 2),
         "largest_asset": {
-            "symbol": largest_symbol,
-            "name":   largest_name,
-            "value":  round(largest_value, 2),
+            "symbol":     largest_symbol,
+            "name":       largest_name,
+            "value":      round(largest_value, 2),
+            "change_24h": round(largest_change_24h, 2),
+            "change_30d": round(largest_change_30d, 2),
         },
-        "categories": categories,
+        "categories":      len(category_names),
+        "category_names":  category_names,
     }
 
     ASSETS_METRICS.write_text(json.dumps(metrics, indent=2))
