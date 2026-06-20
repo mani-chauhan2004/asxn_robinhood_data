@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from app.api.routes.assets.service import get_explorer_data
-from app.schemas.assets import AssetExplorerResponse, SortBy, SortOrder
+from app.schemas.assets import AssetExplorerResponse, Category, SortBy, SortOrder
 
 router = APIRouter(
     prefix="/assets",
@@ -14,7 +14,7 @@ async def get_asset_explorer(
     page:       int       = Query(1,    ge=1),
     limit:      int       = Query(50,   ge=1, le=200),
     search:     str       = Query("",   description="Filter by name or symbol"),
-    category:   str       = Query("",   description="Filter by category"),
+    category:   Category | None = Query(None),
     min_value:  float     = Query(0.0,  ge=0, description="Minimum tokenized value in USD"),
     sort_by:    SortBy    = Query(SortBy.value),
     sort_order: SortOrder = Query(SortOrder.desc),
@@ -24,7 +24,7 @@ async def get_asset_explorer(
             page=page,
             limit=limit,
             search=search,
-            category=category,
+            category=category.value if category else None,
             min_value=min_value,
             sort_by=sort_by.value,
             sort_order=sort_order.value,

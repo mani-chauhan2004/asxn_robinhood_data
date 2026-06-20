@@ -38,6 +38,7 @@ def _load_rows() -> tuple[list[dict], list[str]]:
             "change_30d": round(shares * c30, 2) if c30 is not None else None,
         })
 
+
     return rows, categories
 
 
@@ -45,7 +46,7 @@ def get_explorer_data(
     page:       int,
     limit:      int,
     search:     str,
-    category:   str,
+    category:   str | None,
     min_value:  float,
     sort_by:    str,
     sort_order: str,
@@ -75,5 +76,6 @@ def get_explorer_data(
     return {
         "data":        rows[start:end],
         "categories":  categories,
-        "hasNextPage": has_next,
+        "nextPage": has_next,
+        "totalAssets": len(rows),
     }

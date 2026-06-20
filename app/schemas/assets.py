@@ -16,6 +16,16 @@ class LargestAsset(BaseModel):
     change_30d: float
 
 
+class Category(str, Enum):
+    commodities      = "Commodities"
+    crypto_etfs      = "Crypto ETFs"
+    etfs             = "ETFs"
+    etns             = "ETNs"
+    private_equities = "Private Equities"
+    stocks           = "Stocks"
+    us_treasuries    = "US Treasuries"
+
+
 class SortBy(str, Enum):
     name      = "name"
     symbol    = "symbol"
@@ -50,7 +60,8 @@ class AssetRow(BaseModel):
 class AssetExplorerResponse(BaseModel):
     data:        list[AssetRow]
     categories:  list[str]
-    hasNextPage: int | None
+    nextPage: int | None
+    totalAssets: int
 
 
 class AssetsMetricsResponse(BaseModel):
