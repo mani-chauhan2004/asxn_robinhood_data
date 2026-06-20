@@ -100,7 +100,7 @@ def compute_assets_metrics() -> None:
 
     price_map = {r["symbol"]: r["price"] for r in sp_rows}
 
-    # Categories from token_factory
+    # Use token_factory as source of truth for total assets and categories
     category_names = sorted({r["category"] for r in tf_rows})
     total_assets   = len({r["token_symbol"] for r in tf_rows})
 
