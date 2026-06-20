@@ -115,7 +115,7 @@ def compute_assets_metrics() -> None:
     total_value = sum(v for v, _, _ in asset_values)
 
     top_assets = [
-        {"symbol": sym, "name": name}
+        {"symbol": sym, "name": name, "logo_url": ""}
         for _, sym, name in asset_values[:7]
     ]
 

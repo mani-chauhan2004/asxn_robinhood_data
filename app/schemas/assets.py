@@ -4,6 +4,7 @@ from pydantic import BaseModel
 class TopAsset(BaseModel):
     symbol: str
     name: str
+    logo_url: str = ""
 
 
 class LargestAsset(BaseModel):
