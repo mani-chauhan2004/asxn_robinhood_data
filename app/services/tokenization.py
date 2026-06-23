@@ -1,6 +1,7 @@
 import json
 from collections import defaultdict
 from datetime import date, timedelta
+from warnings import warn
 
 from app.core.paths import DATA_DIR
 from app.schemas.tokenization import (
@@ -11,6 +12,8 @@ from app.schemas.tokenization import (
     TimePeriod,
     TVTPoint,
     TVTResponse,
+    ValueByCategoryPoint,
+    ValueByCategoryResponse,
 )
 
 _PERIOD_DELTAS = {
@@ -210,4 +213,61 @@ def get_assets_tokenized_over_time(
         period=period,
         earliest_date=earliest,
         latest_date=latest,
+    )
+    
+    
+def get_value_by_category(
+    period: TimePeriod | None,
+    from_date: date | None,
+    to_date: date | None,
+) -> ValueByCategoryResponse:
+    
+    dm_rows = json.loads((DATA_DIR / "daily_metrics.json").read_text()).get("rows", [])
+    sp_rows = json.loads((DATA_DIR / "stock_prices.json").read_text()).get("rows", [])
+    
+    price_map = {r["symbol"]: r["price"] for r in sp_rows}
+    
+    all_days = sorted({r["day"] for r in dm_rows})
+    earliest = all_days[0] if all_days else date.today().isoformat()
+    latest = all_days[-1] if all_days else date.today().isoformat()
+    
+    end = to_date.isoformat() if to_date else latest
+    if from_date:
+        start = from_date.isoformat()
+    elif period and period != TimePeriod.all:
+        start = (date.fromisoformat(end) - _PERIOD_DELTAS[period]).isoformat()
+    else:
+        start = earliest
+        
+    value_by_category: dict[str, dict[str,float]] = defaultdict(dict)
+    for r in dm_rows:
+        day = r["day"]
+        if not (start <= day <= end):
+            continue
+        
+        if r["token_symbol"] not in price_map:
+            warn(f"Token symbol {r['token_symbol']} not found in price map")
+        value_by_category[day][r["category"]] = value_by_category[day].get(r["category"], 0.0) + r["cumulative_tvl"] * price_map.get(r["token_symbol"], 0.0)
+        
+    pct_by_category: dict[str, dict[str,float]] = defaultdict(dict)
+    for day in sorted(value_by_category):
+        total = sum(value_by_category[day].values())
+        for category in value_by_category[day]:
+            pct_by_category[day][category] = value_by_category[day][category] / total
+        
+    points = [
+        ValueByCategoryPoint(
+            date=day,
+            categories=value_by_category[day],
+            pct_by_category=pct_by_category[day],
+        )
+        for day in sorted(value_by_category)
+    ]
+    
+    return ValueByCategoryResponse(
+        data=points,
+        period=period,
+        earliest_date=earliest,
+        latest_date=latest,
+        categories = sorted(set(category for day in sorted(value_by_category) for category in value_by_category[day]))
     )

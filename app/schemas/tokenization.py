@@ -59,3 +59,15 @@ class AssetsTokenizedOverTimeResponse(BaseModel):
     period:         TimePeriod | None
     earliest_date:  str
     latest_date:    str
+
+class ValueByCategoryPoint(BaseModel):
+    date:  str
+    categories: dict[str,float]
+    pct_by_category: dict[str,float]
+
+class ValueByCategoryResponse(BaseModel):
+    data:           list[ValueByCategoryPoint]
+    period:         TimePeriod | None
+    earliest_date:  str
+    latest_date:    str
+    categories:     list[str]
