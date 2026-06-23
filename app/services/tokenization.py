@@ -93,14 +93,24 @@ def get_mint_burns(
     total_by_day: dict[str, float] = defaultdict(float)
 
     last24h_date = date.today() - timedelta(days=1)
+    last_30d_date = date.today() - timedelta(days=30)
     last24h_mint = 0.0
     last24h_burn = 0.0
+    last24h_net = 0.0
+    last_30d_mint = 0.0
+    last_30d_burn = 0.0
+    last_30d_net = 0.0
     for r in dm_rows:
         day = r["day"]
         if date.strptime(day, "%Y-%m-%d") >= last24h_date:
             last24h_mint += r["mint_volume"]
             last24h_burn += r["burn_volume"]
-
+            last24h_net += r["net_change"]
+        if date.strptime(day, "%Y-%m-%d") >= last_30d_date:
+            last_30d_mint += r["mint_volume"]
+            last_30d_burn += r["burn_volume"]
+            last_30d_net += r["net_change"]
+            
         if not (start <= day <= end):
             continue
         mint_by_day[day] += r["mint_volume"]
@@ -131,6 +141,10 @@ def get_mint_burns(
         total_net=sum(total_by_day.values()),
         last24h_mint=last24h_mint,
         last24h_burn=last24h_burn,
+        last24h_net=last24h_net,
+        last_30d_mint=last_30d_mint,
+        last_30d_burn=last_30d_burn,
+        last_30d_net=last_30d_net,
         period=period,
         earliest_date=earliest,
         latest_date=latest,
@@ -169,12 +183,13 @@ def get_assets_tokenized_over_time(
         day = block_time_to_date(r["block_time"])
         if not (start <= day <= end):
             continue
-        count_by_day[day].count += 1
         count_by_day[day].symbols.append(r["token_symbol"])
 
     cumulative_count: dict[str, float] = defaultdict(float)
     c = 0.0
     for day in sorted(count_by_day):
+        count_by_day[day].count = len(set(count_by_day[day].symbols))
+        count_by_day[day].symbols = list(set(count_by_day[day].symbols))
         c += count_by_day[day].count
         cumulative_count[day] = c
         

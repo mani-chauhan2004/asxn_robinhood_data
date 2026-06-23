@@ -38,6 +38,10 @@ class MintBurnResponse(BaseModel):
     total_net:      float
     last24h_mint:   float
     last24h_burn:   float
+    last24h_net:    float
+    last_30d_mint:  float
+    last_30d_burn:  float
+    last_30d_net:   float
     period:         TimePeriod | None
     earliest_date:  str
     latest_date:    str
