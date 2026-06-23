@@ -1,0 +1,25 @@
+from datetime import date
+from enum import Enum
+from pydantic import BaseModel
+
+
+class TimePeriod(str, Enum):
+    one_day       = "1D"
+    seven_days    = "7D"
+    one_month     = "1M"
+    three_months  = "3M"
+    one_year      = "1Y"
+    all           = "ALL"
+
+
+class TVTPoint(BaseModel):
+    date:  str
+    value: float
+
+
+class TVTResponse(BaseModel):
+    data:           list[TVTPoint]
+    current_value:  float
+    period:         TimePeriod | None
+    earliest_date:  str
+    latest_date:    str
