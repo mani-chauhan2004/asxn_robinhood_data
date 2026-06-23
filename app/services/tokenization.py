@@ -1,7 +1,6 @@
 import json
 from collections import defaultdict
 from datetime import date, timedelta
-from warnings import warn
 
 from app.core.paths import DATA_DIR
 from app.schemas.tokenization import (
@@ -250,9 +249,6 @@ def get_value_by_category(
         day = r["day"]
         if not (start <= day <= end):
             continue
-        
-        if r["token_symbol"] not in price_map:
-            warn(f"Token symbol {r['token_symbol']} not found in price map")
         value_by_category[day][r["category"]] = value_by_category[day].get(r["category"], 0.0) + r["cumulative_tvl"] * price_map.get(r["token_symbol"], 0.0)
         
     pct_by_category: dict[str, dict[str,float]] = defaultdict(dict)
