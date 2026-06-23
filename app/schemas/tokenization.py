@@ -23,3 +23,21 @@ class TVTResponse(BaseModel):
     period:         TimePeriod | None
     earliest_date:  str
     latest_date:    str
+
+class MintBurnPoint(BaseModel):
+    date:  str
+    mint:  float
+    burn:  float
+    total: float
+    cumulative_total:float
+
+class MintBurnResponse(BaseModel):
+    data:           list[MintBurnPoint]
+    total_mint:     float
+    total_burn:     float
+    total_net:      float
+    last24h_mint:   float
+    last24h_burn:   float
+    period:         TimePeriod | None
+    earliest_date:  str
+    latest_date:    str
