@@ -71,3 +71,37 @@ class ValueByCategoryResponse(BaseModel):
     earliest_date:  str
     latest_date:    str
     categories:     list[str]
+
+
+class ValueByCategoryDonutSlice(BaseModel):
+    category: str
+    current_value_usd: float
+
+class ValueByCategoryDonutResponse(BaseModel):
+    slices: list[ValueByCategoryDonutSlice]
+    total_value_usd: float
+    categories: list[str]
+
+
+class TokensByCategoryDonutSlice(BaseModel):
+    category: str
+    token_count: int
+
+class TokensByCategoryDonutResponse(BaseModel):
+    slices: list[TokensByCategoryDonutSlice]
+    total_token_count: int
+    categories: list[str]
+
+
+class MintBurnByCategoryDonutSlice(BaseModel):
+    category: str
+    mint_24h: float
+    burn_24h: float
+    net_24h: float
+
+class MintBurnByCategoryDonutResponse(BaseModel):
+    slices: list[MintBurnByCategoryDonutSlice]
+    total_mint_24h: float
+    total_burn_24h: float
+    total_net_24h: float
+    categories: list[str]

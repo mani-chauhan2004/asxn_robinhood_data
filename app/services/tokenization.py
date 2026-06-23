@@ -7,11 +7,17 @@ from app.core.paths import DATA_DIR
 from app.schemas.tokenization import (
     AssetsTokenizedOverTimePoint,
     AssetsTokenizedOverTimeResponse,
+    MintBurnByCategoryDonutResponse,
+    MintBurnByCategoryDonutSlice,
     MintBurnPoint,
     MintBurnResponse,
     TimePeriod,
+    TokensByCategoryDonutResponse,
+    TokensByCategoryDonutSlice,
     TVTPoint,
     TVTResponse,
+    ValueByCategoryDonutResponse,
+    ValueByCategoryDonutSlice,
     ValueByCategoryPoint,
     ValueByCategoryResponse,
 )
@@ -270,4 +276,99 @@ def get_value_by_category(
         earliest_date=earliest,
         latest_date=latest,
         categories = sorted(set(category for day in sorted(value_by_category) for category in value_by_category[day]))
+    )
+
+
+def get_value_by_category_donut() -> ValueByCategoryDonutResponse:
+    tf_rows = json.loads((DATA_DIR / "token_factory.json").read_text()).get("rows", [])
+    tb_rows = json.loads((DATA_DIR / "token_balances.json").read_text()).get("rows", [])
+    sp_rows = json.loads((DATA_DIR / "stock_prices.json").read_text()).get("rows", [])
+
+    balance_map = {r["token_symbol"]: r for r in tb_rows}
+    price_map = {r["symbol"]: r for r in sp_rows}
+
+    seen: set[str] = set()
+    agg: dict[str, float] = defaultdict(float)
+    for r in tf_rows:
+        sym = r["token_symbol"]
+        if sym in seen:
+            continue
+        seen.add(sym)
+        shares = balance_map.get(sym, {}).get("shares_tokenized", 0.0)
+        price = price_map.get(sym, {}).get("price", 0.0)
+        agg[r["category"]] += shares * price
+
+    categories = sorted(agg.keys())
+    slices = [
+        ValueByCategoryDonutSlice(category=cat, current_value_usd=round(agg[cat], 2))
+        for cat in categories
+    ]
+    total = round(sum(s.current_value_usd for s in slices), 2)
+
+    return ValueByCategoryDonutResponse(
+        slices=slices,
+        total_value_usd=total,
+        categories=categories,
+    )
+
+
+def get_tokens_by_category_donut() -> TokensByCategoryDonutResponse:
+    tf_rows = json.loads((DATA_DIR / "token_factory.json").read_text()).get("rows", [])
+
+    seen: dict[str, str] = {}
+    for r in tf_rows:
+        if r["token_symbol"] not in seen:
+            seen[r["token_symbol"]] = r["category"]
+
+    count_by_cat: dict[str, int] = defaultdict(int)
+    for cat in seen.values():
+        count_by_cat[cat] += 1
+
+    categories = sorted(count_by_cat.keys())
+    slices = [
+        TokensByCategoryDonutSlice(category=cat, token_count=count_by_cat[cat])
+        for cat in categories
+    ]
+
+    return TokensByCategoryDonutResponse(
+        slices=slices,
+        total_token_count=sum(s.token_count for s in slices),
+        categories=categories,
+    )
+
+
+def get_mint_burn_by_category_donut() -> MintBurnByCategoryDonutResponse:
+    dm_rows = json.loads((DATA_DIR / "daily_metrics.json").read_text()).get("rows", [])
+
+    if not dm_rows:
+        return MintBurnByCategoryDonutResponse(
+            slices=[], total_mint_24h=0, total_burn_24h=0, total_net_24h=0, categories=[]
+        )
+
+    latest_day = max(r["day"] for r in dm_rows)
+
+    mint_by_cat: dict[str, float] = defaultdict(float)
+    burn_by_cat: dict[str, float] = defaultdict(float)
+    for r in dm_rows:
+        if r["day"] == latest_day:
+            mint_by_cat[r["category"]] += r["mint_volume"]
+            burn_by_cat[r["category"]] += r["burn_volume"]
+
+    categories = sorted(set(mint_by_cat.keys()) | set(burn_by_cat.keys()))
+    slices = [
+        MintBurnByCategoryDonutSlice(
+            category=cat,
+            mint_24h=round(mint_by_cat[cat], 2),
+            burn_24h=round(burn_by_cat[cat], 2),
+            net_24h=round(mint_by_cat[cat] - burn_by_cat[cat], 2),
+        )
+        for cat in categories
+    ]
+
+    return MintBurnByCategoryDonutResponse(
+        slices=slices,
+        total_mint_24h=round(sum(s.mint_24h for s in slices), 2),
+        total_burn_24h=round(sum(s.burn_24h for s in slices), 2),
+        total_net_24h=round(sum(s.net_24h for s in slices), 2),
+        categories=categories,
     )
