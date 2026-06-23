@@ -3,21 +3,29 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 from app.core.paths import DATA_DIR
-from app.schemas.tokenization import MintBurnPoint, MintBurnResponse, TimePeriod, TVTPoint, TVTResponse
+from app.schemas.tokenization import (
+    AssetsTokenizedOverTimePoint,
+    AssetsTokenizedOverTimeResponse,
+    MintBurnPoint,
+    MintBurnResponse,
+    TimePeriod,
+    TVTPoint,
+    TVTResponse,
+)
 
 _PERIOD_DELTAS = {
-    TimePeriod.one_day:      timedelta(days=1),
-    TimePeriod.seven_days:   timedelta(days=7),
-    TimePeriod.one_month:    timedelta(days=30),
+    TimePeriod.one_day: timedelta(days=1),
+    TimePeriod.seven_days: timedelta(days=7),
+    TimePeriod.one_month: timedelta(days=30),
     TimePeriod.three_months: timedelta(days=90),
-    TimePeriod.one_year:     timedelta(days=365),
+    TimePeriod.one_year: timedelta(days=365),
 }
 
 
 def get_tvt(
-    period:    TimePeriod | None,
+    period: TimePeriod | None,
     from_date: date | None,
-    to_date:   date | None,
+    to_date: date | None,
 ) -> TVTResponse:
     dm_rows = json.loads((DATA_DIR / "daily_metrics.json").read_text()).get("rows", [])
     sp_rows = json.loads((DATA_DIR / "stock_prices.json").read_text()).get("rows", [])
@@ -26,9 +34,9 @@ def get_tvt(
 
     all_days = sorted({r["day"] for r in dm_rows})
     earliest = all_days[0] if all_days else date.today().isoformat()
-    latest   = all_days[-1] if all_days else date.today().isoformat()
+    latest = all_days[-1] if all_days else date.today().isoformat()
 
-    end   = to_date.isoformat()   if to_date   else latest
+    end = to_date.isoformat() if to_date else latest
     if from_date:
         start = from_date.isoformat()
     elif period and period != TimePeriod.all:
@@ -56,12 +64,13 @@ def get_tvt(
         earliest_date=earliest,
         latest_date=latest,
     )
-    
+
+
 def get_mint_burns(
     period: TimePeriod | None,
     from_date: date | None,
     to_date: date | None,
-) -> MintBurnResponse: 
+) -> MintBurnResponse:
     dm_rows = json.loads((DATA_DIR / "daily_metrics.json").read_text()).get("rows", [])
     sp_rows = json.loads((DATA_DIR / "stock_prices.json").read_text()).get("rows", [])
 
@@ -69,20 +78,20 @@ def get_mint_burns(
 
     all_days = sorted({r["day"] for r in dm_rows})
     earliest = all_days[0] if all_days else date.today().isoformat()
-    latest   = all_days[-1] if all_days else date.today().isoformat()
-    
-    end   = to_date.isoformat()   if to_date   else latest
+    latest = all_days[-1] if all_days else date.today().isoformat()
+
+    end = to_date.isoformat() if to_date else latest
     if from_date:
         start = from_date.isoformat()
     elif period and period != TimePeriod.all:
         start = (date.fromisoformat(end) - _PERIOD_DELTAS[period]).isoformat()
     else:
         start = earliest
-        
+
     mint_by_day: dict[str, float] = defaultdict(float)
     burn_by_day: dict[str, float] = defaultdict(float)
     total_by_day: dict[str, float] = defaultdict(float)
-    
+
     last24h_date = date.today() - timedelta(days=1)
     last24h_mint = 0.0
     last24h_burn = 0.0
@@ -91,27 +100,29 @@ def get_mint_burns(
         if date.strptime(day, "%Y-%m-%d") >= last24h_date:
             last24h_mint += r["mint_volume"]
             last24h_burn += r["burn_volume"]
-            
+
         if not (start <= day <= end):
             continue
         mint_by_day[day] += r["mint_volume"]
         burn_by_day[day] += r["burn_volume"]
         total_by_day[day] += r["net_change"]
-        
-    cumulative_total:dict[str, float] = defaultdict(float)
+
+    cumulative_total: dict[str, float] = defaultdict(float)
     c = 0.0
     for day in sorted(mint_by_day):
         c += total_by_day[day]
         cumulative_total[day] = c
 
     points = [
-        MintBurnPoint(date=day, mint=round(mint_by_day[day], 2), burn=round(burn_by_day[day], 2), total=round(total_by_day[day], 2), cumulative_total=round(cumulative_total[day], 2))
+        MintBurnPoint(
+            date=day,
+            mint=round(mint_by_day[day], 2),
+            burn=round(burn_by_day[day], 2),
+            total=round(total_by_day[day], 2),
+            cumulative_total=round(cumulative_total[day], 2),
+        )
         for day in sorted(mint_by_day)
     ]
-    
-    
-    
-    
 
     return MintBurnResponse(
         data=points,
@@ -120,6 +131,67 @@ def get_mint_burns(
         total_net=sum(total_by_day.values()),
         last24h_mint=last24h_mint,
         last24h_burn=last24h_burn,
+        period=period,
+        earliest_date=earliest,
+        latest_date=latest,
+    )
+
+
+def get_assets_tokenized_over_time(
+    period: TimePeriod | None,
+    from_date: date | None,
+    to_date: date | None,
+) -> AssetsTokenizedOverTimeResponse:
+    tf_rows = json.loads((DATA_DIR / "token_factory.json").read_text()).get("rows", [])
+    
+    def block_time_to_date(block_time: str) -> str:
+        return date.strptime(block_time.replace(' UTC', ''), '%Y-%m-%d %H:%M:%S.%f').isoformat()
+
+    all_days = sorted({block_time_to_date(r["block_time"]) for r in tf_rows})
+    earliest = all_days[0] if all_days else date.today().isoformat()
+    latest = all_days[-1] if all_days else date.today().isoformat()
+
+    end = to_date.isoformat() if to_date else latest
+    if from_date:
+        start = from_date.isoformat()
+    elif period and period != TimePeriod.all:
+        start = (date.fromisoformat(end) - _PERIOD_DELTAS[period]).isoformat()
+    else:
+        start = earliest
+        
+    class CountByDay:
+        def __init__(self):
+            self.count = 0
+            self.symbols = []
+        
+    count_by_day: dict[str, CountByDay] = defaultdict(CountByDay)
+    for r in tf_rows:
+        day = block_time_to_date(r["block_time"])
+        if not (start <= day <= end):
+            continue
+        count_by_day[day].count += 1
+        count_by_day[day].symbols.append(r["token_symbol"])
+
+    cumulative_count: dict[str, float] = defaultdict(float)
+    c = 0.0
+    for day in sorted(count_by_day):
+        c += count_by_day[day].count
+        cumulative_count[day] = c
+        
+    points = [
+        AssetsTokenizedOverTimePoint(
+            date=day,
+            count=count_by_day[day].count,
+            cumulative_count=cumulative_count[day],
+            current_day_tokenized=count_by_day[day].symbols,
+        )
+        for day in sorted(count_by_day)
+    ]
+    
+    return AssetsTokenizedOverTimeResponse(
+        data=points,
+        current_count=points[-1].count if points else 0.0,
+        total_count=cumulative_count[latest],
         period=period,
         earliest_date=earliest,
         latest_date=latest,

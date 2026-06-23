@@ -41,3 +41,17 @@ class MintBurnResponse(BaseModel):
     period:         TimePeriod | None
     earliest_date:  str
     latest_date:    str
+    
+class AssetsTokenizedOverTimePoint(BaseModel):
+    date:  str
+    count: float
+    cumulative_count: float
+    current_day_tokenized: list[str]
+
+class AssetsTokenizedOverTimeResponse(BaseModel):
+    data:           list[AssetsTokenizedOverTimePoint]
+    current_count:  float
+    total_count:    float
+    period:         TimePeriod | None
+    earliest_date:  str
+    latest_date:    str
