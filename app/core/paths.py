@@ -7,6 +7,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 
 # Reference files used by scripts
 SYMBOLS_FILE     = PROJECT_ROOT / "lib" / "token_symbols_array.json"
+TOKEN_FACTORY    = DATA_DIR / "token_factory.json"
 STOCK_PRICES_CSV  = DATA_DIR / "robinhood_stock_prices.csv"
 ASSETS_METRICS    = DATA_DIR / "assets" / "assets_metrics.json"
 
