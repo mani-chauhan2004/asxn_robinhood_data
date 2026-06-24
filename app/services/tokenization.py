@@ -11,6 +11,7 @@ from app.schemas.tokenization import (
     MintBurnPoint,
     MintBurnResponse,
     TimePeriod,
+    TokenizationStatsResponse,
     TokensByCategoryDonutResponse,
     TokensByCategoryDonutSlice,
     TVTPoint,
@@ -110,20 +111,21 @@ def get_mint_burns(
     last_30d_net = 0.0
     for r in dm_rows:
         day = r["day"]
+        price = price_map.get(r["token_symbol"], 0.0)
         if date.strptime(day, "%Y-%m-%d") >= last24h_date:
-            last24h_mint += r["mint_volume"]
-            last24h_burn += r["burn_volume"]
-            last24h_net += r["net_change"]
+            last24h_mint += r["mint_volume"] * price
+            last24h_burn += r["burn_volume"] * price
+            last24h_net += r["net_change"] * price
         if date.strptime(day, "%Y-%m-%d") >= last_30d_date:
-            last_30d_mint += r["mint_volume"]
-            last_30d_burn += r["burn_volume"]
-            last_30d_net += r["net_change"]
-            
+            last_30d_mint += r["mint_volume"] * price
+            last_30d_burn += r["burn_volume"] * price
+            last_30d_net += r["net_change"] * price
+
         if not (start <= day <= end):
             continue
-        mint_by_day[day] += r["mint_volume"]
-        burn_by_day[day] += r["burn_volume"]
-        total_by_day[day] += r["net_change"]
+        mint_by_day[day] += r["mint_volume"] * price
+        burn_by_day[day] += r["burn_volume"] * price
+        total_by_day[day] += r["net_change"] * price
 
     cumulative_total: dict[str, float] = defaultdict(float)
     c = 0.0
@@ -272,6 +274,73 @@ def get_value_by_category(
         earliest_date=earliest,
         latest_date=latest,
         categories = sorted(set(category for day in sorted(value_by_category) for category in value_by_category[day]))
+    )
+
+
+def get_tokenization_stats() -> TokenizationStatsResponse:
+    dm_rows = json.loads((DATA_DIR / "daily_metrics.json").read_text()).get("rows", [])
+    tf_rows = json.loads((DATA_DIR / "token_factory.json").read_text()).get("rows", [])
+    tb_rows = json.loads((DATA_DIR / "token_balances.json").read_text()).get("rows", [])
+    sp_rows = json.loads((DATA_DIR / "stock_prices.json").read_text()).get("rows", [])
+
+    price_map = {r["symbol"]: r["price"] for r in sp_rows}
+
+    days = sorted({r["day"] for r in dm_rows})
+    today = days[-1] if days else date.today().isoformat()
+    yesterday = days[-2] if len(days) >= 2 else today
+    seven_days_ago = (date.fromisoformat(today) - timedelta(days=7)).isoformat()
+
+    # 1. Total Assets Tokenized + 7d change
+    all_symbols: set[str] = set()
+    symbols_7d_ago: set[str] = set()
+    for r in tf_rows:
+        all_symbols.add(r["token_symbol"])
+        if r["block_time"][:10] <= seven_days_ago:
+            symbols_7d_ago.add(r["token_symbol"])
+    total_assets = len(all_symbols)
+    assets_change_7d = total_assets - len(symbols_7d_ago)
+
+    # 2. Total Value Tokenized + 7d pct change
+    total_value = sum(
+        r.get("shares_tokenized", 0.0) * price_map.get(r["token_symbol"], 0.0)
+        for r in tb_rows
+    )
+    tvt_today = sum(
+        r["cumulative_tvl"] * price_map.get(r["token_symbol"], 0.0)
+        for r in dm_rows if r["day"] == today
+    )
+    tvt_7d = sum(
+        r["cumulative_tvl"] * price_map.get(r["token_symbol"], 0.0)
+        for r in dm_rows if r["day"] == seven_days_ago
+    )
+    value_change_pct_7d = round((tvt_today - tvt_7d) / tvt_7d * 100, 1) if tvt_7d else 0.0
+
+    # 3. Daily Net Change
+    daily_net = sum(
+        r["net_change"] * price_map.get(r["token_symbol"], 0.0)
+        for r in dm_rows if r["day"] == today
+    )
+
+    # 4. 24H Mint Volume + day-over-day change
+    mint_today = sum(
+        r["mint_volume"] * price_map.get(r["token_symbol"], 0.0)
+        for r in dm_rows if r["day"] == today
+    )
+    mint_yesterday = sum(
+        r["mint_volume"] * price_map.get(r["token_symbol"], 0.0)
+        for r in dm_rows if r["day"] == yesterday
+    )
+    mint_change_pct = round((mint_today - mint_yesterday) / mint_yesterday * 100, 1) if mint_yesterday else 0.0
+
+    return TokenizationStatsResponse(
+        total_assets_tokenized=total_assets,
+        assets_change_7d=assets_change_7d,
+        total_value_tokenized_usd=round(total_value, 2),
+        value_change_pct_7d=value_change_pct_7d,
+        daily_net_change_usd=round(daily_net, 2),
+        net_minting=daily_net > 0,
+        mint_volume_24h_usd=round(mint_today, 2),
+        mint_volume_change_pct_24h=mint_change_pct,
     )
 
 

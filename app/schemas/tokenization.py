@@ -93,6 +93,17 @@ class TokensByCategoryDonutResponse(BaseModel):
     categories: list[str]
 
 
+class TokenizationStatsResponse(BaseModel):
+    total_assets_tokenized: int
+    assets_change_7d: int
+    total_value_tokenized_usd: float
+    value_change_pct_7d: float
+    daily_net_change_usd: float
+    net_minting: bool
+    mint_volume_24h_usd: float
+    mint_volume_change_pct_24h: float
+
+
 class MintBurnByCategoryDonutSlice(BaseModel):
     category: str
     mint_24h: float
